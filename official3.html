@@ -1,0 +1,2018 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tinh Tú Triệu Gọi - Định Mệnh Biển Sao</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Cinzel & Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800;900&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Phosphor Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <!-- Tone.js (Âm thanh hiệu ứng & nhạc nền) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+
+    <style>
+        :root {
+            --glare-x: 50%;
+            --glare-y: 50%;
+            --glare-opacity: 0.12;
+            --prism-angle: 130deg;
+            --corner-frost-opacity: 0;
+        }
+
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #040612;
+            color: #f8fafc;
+            font-family: 'Inter', sans-serif;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+        }
+
+        .font-mystic {
+            font-family: 'Cinzel', serif;
+        }
+
+        /* Canvas nền không gian & hạt ánh sáng */
+        #bgCanvas {
+            position: fixed;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+            pointer-events: none;
+            display: block;
+        }
+
+        /* Khung kính mờ chỉ dùng cho UI tĩnh (không áp dụng lên thẻ 3D đang chuyển động để giữ 60fps) */
+        .glass-panel {
+            background: rgba(12, 18, 38, 0.72);
+            border: 1px solid rgba(255, 255, 255, 0.14);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+        }
+
+        /* Nút Triệu Hồi & Nút Liên Kết hiệu ứng Lăng Kính Prisma */
+        .btn-summon {
+            position: relative;
+            overflow: hidden;
+            background: linear-gradient(135deg, rgba(20, 32, 68, 0.92), rgba(36, 22, 68, 0.92));
+            border: 1.5px solid rgba(186, 230, 253, 0.65);
+            box-shadow:
+                0 0 22px rgba(125, 211, 252, 0.32),
+                0 0 42px rgba(244, 114, 182, 0.18),
+                inset 0 0 18px rgba(255, 255, 255, 0.14);
+            transition: transform 0.22s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+        }
+
+        .btn-summon::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -75%;
+            width: 55%;
+            height: 200%;
+            background: linear-gradient(
+                115deg,
+                transparent 0%,
+                rgba(125, 211, 252, 0.35) 35%,
+                rgba(255, 255, 255, 0.75) 50%,
+                rgba(244, 114, 182, 0.35) 65%,
+                transparent 100%
+            );
+            transform: skewX(-22deg);
+            animation: btnShimmer 3.6s ease-in-out infinite;
+            pointer-events: none;
+        }
+
+        .btn-summon:hover {
+            transform: translateY(-2px) scale(1.025);
+            border-color: rgba(255, 255, 255, 0.92);
+            box-shadow:
+                0 0 30px rgba(125, 211, 252, 0.55),
+                0 0 56px rgba(244, 114, 182, 0.32),
+                inset 0 0 22px rgba(255, 255, 255, 0.24);
+        }
+
+        .btn-summon:active {
+            transform: translateY(0) scale(0.985);
+        }
+
+        @keyframes btnShimmer {
+            0% { left: -75%; }
+            55%, 100% { left: 135%; }
+        }
+
+        /* Tiêu đề chính chuyển sắc xanh ngọc - tím oải hương - hồng phấn như mẫu */
+        .title-astral-gradient {
+            background: linear-gradient(
+                90deg,
+                #bae6fd 0%,
+                #a5f3fc 26%,
+                #c4b5fd 56%,
+                #f9a8d4 85%,
+                #fbcfe8 100%
+            );
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            filter: drop-shadow(0 0 22px rgba(165, 243, 252, 0.24));
+        }
+
+        /* Huy hiệu ngôi sao băng ở trung tâm phía trên tiêu đề */
+        .lobby-shooting-star-badge {
+            width: 68px;
+            height: 68px;
+            border-radius: 9999px;
+            background: radial-gradient(circle at 35% 30%, rgba(125, 211, 252, 0.16), rgba(15, 23, 48, 0.72) 72%);
+            border: 1px solid rgba(186, 230, 253, 0.28);
+            box-shadow:
+                0 0 24px rgba(125, 211, 252, 0.22),
+                inset 0 0 14px rgba(186, 230, 253, 0.12);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Chớp sáng lăng kính trong suốt khi thẻ mở ra (giữ độ xuyên thấu cao) */
+        #summonFlash {
+            position: fixed;
+            inset: 0;
+            z-index: 35;
+            pointer-events: none;
+            opacity: 0;
+            mix-blend-mode: screen;
+            background: radial-gradient(
+                circle at center,
+                rgba(255, 255, 255, 0.9) 0%,
+                rgba(186, 230, 253, 0.55) 26%,
+                rgba(244, 114, 182, 0.3) 52%,
+                rgba(167, 139, 250, 0.14) 76%,
+                transparent 100%
+            );
+            transition: opacity 0.45s ease-out;
+        }
+
+        /* =====================================================================
+           2. SÂN KHẤU 3D & HÀO QUANG PRISMA NẰM HOÀN TOÀN PHÍA SAU LƯNG THẺ
+           ===================================================================== */
+        .scene-3d {
+            position: relative;
+            width: 100%;
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            perspective: 1400px;
+            overflow: visible;
+            cursor: grab;
+            touch-action: none;
+        }
+
+        .scene-3d:active {
+            cursor: grabbing;
+        }
+
+        /* Tầng hào quang Prisma cố định phía sau lưng thẻ (không đè mặt trước) */
+        .aura-behind-layer {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1;
+            pointer-events: none;
+            opacity: 0;
+            transform: translate3d(0, 0, -140px) scale(0.75);
+            transition: opacity 0.7s ease-out, transform 0.85s cubic-bezier(0.22, 1, 0.36, 1);
+            mix-blend-mode: screen;
+        }
+
+        .aura-behind-layer.active {
+            opacity: 1;
+            transform: translate3d(0, 0, -140px) scale(1);
+        }
+
+        /* Lõi sáng pha lê trong suốt phía sau thẻ */
+        .prism-core-halo {
+            position: absolute;
+            width: min(78vw, 660px);
+            height: min(78vw, 660px);
+            border-radius: 50%;
+            background: radial-gradient(
+                circle,
+                rgba(255, 255, 255, 0.68) 0%,
+                rgba(165, 243, 252, 0.42) 22%,
+                rgba(196, 181, 253, 0.24) 44%,
+                rgba(249, 168, 212, 0.12) 64%,
+                transparent 78%
+            );
+        }
+
+        /* Chùm tia tán sắc cầu vồng God Rays xoay nhẹ phía sau lưng thẻ */
+        .prism-god-rays {
+            position: absolute;
+            width: min(94vw, 820px);
+            height: min(94vw, 820px);
+            border-radius: 50%;
+            background: repeating-conic-gradient(
+                from 0deg,
+                rgba(255, 255, 255, 0.24) 0deg 5deg,
+                rgba(125, 211, 252, 0.18) 5deg 12deg,
+                transparent 12deg 22deg,
+                rgba(244, 114, 182, 0.16) 22deg 28deg,
+                rgba(253, 224, 71, 0.14) 28deg 34deg,
+                transparent 34deg 45deg
+            );
+            -webkit-mask-image: radial-gradient(circle, rgba(0, 0, 0, 0.92) 12%, rgba(0, 0, 0, 0.38) 54%, transparent 74%);
+            mask-image: radial-gradient(circle, rgba(0, 0, 0, 0.92) 12%, rgba(0, 0, 0, 0.38) 54%, transparent 74%);
+            animation: spinSlow 28s linear infinite;
+            will-change: transform;
+        }
+
+        /* Vệt lóe sáng ngang Anamorphic Lens Flare */
+        .prism-lens-flare {
+            position: absolute;
+            width: min(96vw, 900px);
+            height: 4px;
+            background: linear-gradient(
+                90deg,
+                transparent 0%,
+                rgba(125, 211, 252, 0.45) 22%,
+                rgba(255, 255, 255, 0.92) 50%,
+                rgba(244, 114, 182, 0.45) 78%,
+                transparent 100%
+            );
+            box-shadow:
+                0 0 20px rgba(186, 230, 253, 0.65),
+                0 0 42px rgba(244, 114, 182, 0.32);
+            opacity: 0.78;
+        }
+
+        /* Vòng ma pháp Prisma xoay phía sau lưng thẻ */
+        .prism-magic-ring {
+            position: absolute;
+            width: min(86vw, 620px);
+            height: min(86vw, 620px);
+            opacity: 0.58;
+            animation: spinReverseSlow 42s linear infinite;
+            will-change: transform;
+        }
+
+        @keyframes spinSlow {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        @keyframes spinReverseSlow {
+            from { transform: rotate(360deg); }
+            to { transform: rotate(0deg); }
+        }
+
+        /* =====================================================================
+           3. THẺ BÀI 3D PHÓNG LỚN, VIỀN LẤP LÁNH & MẶT TRƯỚC TRONG TRẺO
+           ===================================================================== */
+        .card-3d-wrapper {
+            position: relative;
+            z-index: 10;
+            width: 350px;
+            height: 525px;
+            max-height: 64vh;
+            aspect-ratio: 2 / 3;
+            transform-style: preserve-3d;
+            will-change: transform;
+            opacity: 0;
+        }
+
+        @media (max-width: 640px) {
+            .card-3d-wrapper {
+                width: 285px;
+                height: 428px;
+                max-height: 60vh;
+            }
+        }
+
+        .card-face {
+            position: absolute;
+            inset: 0;
+            border-radius: 20px;
+            transform-style: preserve-3d;
+        }
+
+        /* MẶT TRƯỚC THẺ: Hiển thị trọn vẹn ảnh, viền phát sáng Prisma & chi tiết khung cổ điển */
+        .card-front {
+            overflow: visible;
+            transform: translate3d(0, 0, 22px);
+            background: transparent;
+            padding: 4px;
+            background-image: none;
+            box-shadow:
+                0 22px 50px rgba(0, 0, 0, 0.45),
+                0 0 26px rgba(125, 211, 252, 0.65),
+                0 0 48px rgba(244, 114, 182, 0.52),
+                0 0 72px rgba(196, 181, 253, 0.34);
+            animation: cardBorderPulse 3.2s ease-in-out infinite;
+        }
+
+        /* Khối lõi thân thẻ dày 44px nối liền mặt trước (Z = +22px) và mặt sau (Z = -22px) */
+        .card-3d-body-core {
+            position: absolute;
+            inset: 2px;
+            border-radius: 18px;
+            transform-style: preserve-3d;
+            pointer-events: none;
+            z-index: 2;
+        }
+
+        /* Cạnh bên 3D phát sáng nối từ mặt trước tới mặt kính & các lớp nổi khi xoay ngang thẻ */
+        .card-3d-edge-left,
+        .card-3d-edge-right {
+            position: absolute;
+            top: 8px;
+            bottom: 8px;
+            width: 44px;
+            pointer-events: none;
+            z-index: 4;
+            border-radius: 6px;
+            background: linear-gradient(
+                180deg,
+                rgba(224, 242, 254, 0.96) 0%,
+                rgba(125, 211, 252, 0.88) 28%,
+                rgba(196, 181, 253, 0.85) 55%,
+                rgba(249, 168, 212, 0.92) 82%,
+                rgba(254, 240, 138, 0.98) 100%
+            );
+            box-shadow:
+                0 0 18px rgba(125, 211, 252, 0.8),
+                0 0 32px rgba(244, 114, 182, 0.6);
+            opacity: 0.96;
+        }
+
+        .card-3d-edge-left {
+            left: -20px;
+            transform: rotateY(-90deg) translate3d(0, 0, 20px);
+        }
+
+        .card-3d-edge-right {
+            right: -20px;
+            transform: rotateY(90deg) translate3d(0, 0, 20px);
+        }
+
+        /* Cạnh trên & cạnh dưới 3D khi nghiêng dọc hoặc xoay chéo */
+        .card-3d-edge-top,
+        .card-3d-edge-bottom {
+            position: absolute;
+            left: 10px;
+            right: 10px;
+            height: 44px;
+            pointer-events: none;
+            z-index: 4;
+            border-radius: 6px;
+            background: linear-gradient(
+                90deg,
+                rgba(224, 242, 254, 0.92) 0%,
+                rgba(196, 181, 253, 0.82) 50%,
+                rgba(249, 168, 212, 0.92) 100%
+            );
+            opacity: 0.9;
+        }
+
+        .card-3d-edge-top {
+            top: -20px;
+            transform: rotateX(90deg) translate3d(0, 0, 20px);
+        }
+
+        .card-3d-edge-bottom {
+            bottom: -20px;
+            transform: rotateX(-90deg) translate3d(0, 0, 20px);
+        }
+
+        /* Viền ngoài phát sáng mềm mại quanh thẻ */
+        .card-front::after {
+            content: '';
+            position: absolute;
+            inset: -3px;
+            border-radius: 23px;
+            border: 1.8px solid rgba(255, 255, 255, 0.92);
+            box-shadow:
+                0 0 18px rgba(255, 255, 255, 0.85),
+                0 0 36px rgba(125, 211, 252, 0.65),
+                0 0 56px rgba(249, 168, 212, 0.55);
+            pointer-events: none;
+            z-index: 8;
+        }
+
+        @keyframes cardBorderPulse {
+            0%, 100% {
+                filter: brightness(1) saturate(1.05);
+            }
+            50% {
+                filter: brightness(1.18) saturate(1.25);
+            }
+        }
+
+        /* Lớp viền lấp lánh nhẹ quanh mép ngoài thẻ */
+        .card-prism-border {
+            position: absolute;
+            inset: 0;
+            border-radius: 20px;
+            padding: 4px;
+            background: linear-gradient(
+                var(--prism-angle),
+                rgba(255, 255, 255, 1) 0%,
+                rgba(125, 211, 252, 0.95) 25%,
+                rgba(244, 114, 182, 0.9) 50%,
+                rgba(253, 224, 71, 0.95) 75%,
+                rgba(255, 255, 255, 1) 100%
+            );
+            -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            -webkit-mask-composite: xor;
+            mask-composite: exclude;
+            filter: drop-shadow(0 0 8px rgba(186, 230, 253, 0.8));
+            pointer-events: none;
+            z-index: 6;
+        }
+
+        .card-inner-frame {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            border-radius: 16px;
+            overflow: hidden;
+            background: transparent;
+            transform-style: preserve-3d;
+            box-shadow: none;
+        }
+
+        /* Mặt ngăn cách trong suốt ở giữa, hơi mờ trắng ở 4 góc */
+        .card-corner-frosted-separator {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            transform-style: preserve-3d;
+            transform: translate3d(0, 0, 26px);
+            border-radius: 16px;
+            z-index: 5;
+            background:
+                radial-gradient(circle at 0% 0%, rgba(255, 255, 255, 0.28) 0%, rgba(255, 255, 255, 0.1) 20%, transparent 45%),
+                radial-gradient(circle at 100% 0%, rgba(255, 255, 255, 0.28) 0%, rgba(255, 255, 255, 0.1) 20%, transparent 45%),
+                radial-gradient(circle at 0% 100%, rgba(255, 255, 255, 0.28) 0%, rgba(255, 255, 255, 0.1) 20%, transparent 45%),
+                radial-gradient(circle at 100% 100%, rgba(255, 255, 255, 0.28) 0%, rgba(255, 255, 255, 0.1) 20%, transparent 45%);
+            backdrop-filter: none;
+            -webkit-backdrop-filter: none;
+            box-shadow: none;
+        }
+
+        /* Từng yếu tố tách lẻ và đẩy nổi cách xa mặt trước thẻ trong không gian 3D */
+        .card-detached-element {
+            position: absolute;
+            pointer-events: none;
+            transform-style: preserve-3d;
+        }
+
+        .card-detached-frame-layer {
+            inset: 0;
+            transform: translate3d(0, 0, 44px);
+            z-index: 6;
+        }
+
+        .card-detached-top-badge {
+            top: 16px;
+            left: 16px;
+            transform: translate3d(0, 0, 56px);
+            z-index: 7;
+        }
+
+        .card-detached-top-emblem {
+            top: 16px;
+            right: 16px;
+            transform: translate3d(0, 0, 56px);
+            z-index: 7;
+        }
+
+        .card-detached-bottom-info {
+            bottom: 16px;
+            left: 16px;
+            right: 16px;
+            transform: translate3d(0, 0, 62px);
+            z-index: 8;
+            background: transparent;
+        }
+
+        .card-detached-bottom-info p,
+        .card-detached-bottom-info h3,
+        .card-detached-bottom-info div {
+            background: transparent;
+        }
+
+        /* Khung viền kẻ chỉ trắng + góc bo cổ điển bên trong mặt trước */
+        .card-ornate-inner-border {
+            position: absolute;
+            inset: 8px;
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.48);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+            pointer-events: none;
+            z-index: 5;
+        }
+
+        .card-corner-bracket {
+            position: absolute;
+            width: 24px;
+            height: 24px;
+            pointer-events: none;
+            z-index: 6;
+            border-color: rgba(255, 255, 255, 0.95);
+            filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.55));
+        }
+
+        .card-corner-bracket.tl { top: 5px; left: 5px; border-top: 2.5px solid; border-left: 2.5px solid; border-top-left-radius: 13px; }
+        .card-corner-bracket.tr { top: 5px; right: 5px; border-top: 2.5px solid; border-right: 2.5px solid; border-top-right-radius: 13px; }
+        .card-corner-bracket.bl { bottom: 5px; left: 5px; border-bottom: 2.5px solid; border-left: 2.5px solid; border-bottom-left-radius: 13px; }
+        .card-corner-bracket.br { bottom: 5px; right: 5px; border-bottom: 2.5px solid; border-right: 2.5px solid; border-bottom-right-radius: 13px; }
+
+        /* Huy hiệu độ hiếm 6★ UR & nút biểu tượng góc trên */
+        .card-rarity-badge {
+            background: rgba(14, 16, 32, 0.85);
+            border: 1.5px solid rgba(249, 168, 212, 0.85);
+            color: #fbcfe8;
+            box-shadow:
+                0 0 14px rgba(244, 114, 182, 0.55),
+                inset 0 0 8px rgba(244, 114, 182, 0.25);
+        }
+
+        .card-emblem-badge {
+            background: rgba(14, 16, 32, 0.82);
+            border: 1px solid rgba(255, 255, 255, 0.35);
+            color: #f9a8d4;
+            box-shadow: 0 0 12px rgba(244, 114, 182, 0.38);
+        }
+
+        /* Lớp chuyển sắc nhẹ phía chân thẻ giúp chữ luôn rõ nét trên mọi nền ảnh */
+        .card-bottom-vignette {
+            display: none;
+        }
+
+        .card-artwork-img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            object-position: center;
+            display: block;
+            image-rendering: high-quality;
+            position: relative;
+            z-index: 1;
+            transform: translate3d(0, 0, -44px) scale(1.08);
+            transform-style: preserve-3d;
+            backface-visibility: hidden;
+            -webkit-backface-visibility: hidden;
+            filter: contrast(1.03) saturate(1.04) unsharp-mask(0.5px);
+        }
+
+        @media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+            .card-artwork-img {
+                image-rendering: auto;
+            }
+        }
+
+        /* Lớp mặt kính bóng ngăn cách mặt trước và các elements phía trước nó */
+        .card-glass-pane {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            z-index: 4;
+            border-radius: inherit;
+            opacity: var(--corner-frost-opacity);
+            background:
+                radial-gradient(circle at 0% 0%, rgba(255, 255, 255, 0.34) 0%, rgba(224, 242, 254, 0.16) 24%, transparent 52%),
+                radial-gradient(circle at 100% 0%, rgba(255, 255, 255, 0.34) 0%, rgba(249, 168, 212, 0.16) 24%, transparent 52%),
+                radial-gradient(circle at 0% 100%, rgba(255, 255, 255, 0.34) 0%, rgba(196, 181, 253, 0.16) 24%, transparent 52%),
+                radial-gradient(circle at 100% 100%, rgba(255, 255, 255, 0.34) 0%, rgba(254, 240, 138, 0.16) 24%, transparent 52%);
+            box-shadow: inset 0 0 26px rgba(255, 255, 255, 0.18);
+            backdrop-filter: blur(2.5px);
+            -webkit-backdrop-filter: blur(2.5px);
+            transition: opacity 0.16s ease-out;
+        }
+
+        /* Điểm lấp lánh nhẹ ở 4 góc viền */
+        .border-sparkle {
+            position: absolute;
+            width: 16px;
+            height: 16px;
+            pointer-events: none;
+            z-index: 7;
+            opacity: 0.85;
+            animation: sparklePulse 2.8s ease-in-out infinite;
+        }
+
+        .border-sparkle.tl { top: 6px; left: 6px; animation-delay: 0s; }
+        .border-sparkle.tr { top: 6px; right: 6px; animation-delay: 0.7s; }
+        .border-sparkle.bl { bottom: 6px; left: 6px; animation-delay: 1.4s; }
+        .border-sparkle.br { bottom: 6px; right: 6px; animation-delay: 2.1s; }
+
+        @keyframes sparklePulse {
+            0%, 100% { transform: scale(0.72) rotate(0deg); opacity: 0.45; }
+            50% { transform: scale(1.15) rotate(45deg); opacity: 1; }
+        }
+
+        /* =====================================================================
+           4. MẶT SAU THẺ: VÒNG TRÒN MA PHÁP KẾT HỢP BẢN ĐỒ SAO VÀNG KIM
+           ===================================================================== */
+        .card-back {
+            transform: translate3d(0, 0, -22px) rotateY(180deg);
+            background: radial-gradient(circle at 50% 45%, #162044 0%, #090e24 62%, #050816 100%);
+            border: 3px solid #d4af37;
+            box-shadow:
+                0 22px 50px rgba(0, 0, 0, 0.65),
+                inset 0 0 28px rgba(212, 175, 55, 0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        .gold-ring-outer {
+            transform-origin: 175px 262.5px;
+            animation: spinSlow 46s linear infinite;
+        }
+
+        .gold-ring-inner {
+            transform-origin: 175px 262.5px;
+            animation: spinReverseSlow 34s linear infinite;
+        }
+
+        /* =====================================================================
+           5. TRỤ 10 THẺ BÀI XOAY 2 VÒNG & HÀO QUANG TRUNG TÂM
+           ===================================================================== */
+        #cylinderStage {
+            position: fixed;
+            inset: 0;
+            z-index: 26;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            perspective: 1500px;
+            pointer-events: none;
+            overflow: hidden;
+            opacity: 0;
+            transition: opacity 0.95s ease;
+        }
+
+        #cylinderStage.active {
+            display: flex;
+            opacity: 1;
+        }
+
+        #cylinderStage::before {
+            content: '';
+            position: absolute;
+            width: min(74vw, 560px);
+            height: min(74vw, 560px);
+            border-radius: 50%;
+            background: radial-gradient(
+                circle,
+                rgba(254, 240, 138, 0.22) 0%,
+                rgba(125, 211, 252, 0.16) 42%,
+                rgba(244, 114, 182, 0.08) 65%,
+                transparent 78%
+            );
+            pointer-events: none;
+        }
+
+        .cylinder-drum {
+            position: relative;
+            width: 0;
+            height: 0;
+            transform-style: preserve-3d;
+            will-change: transform;
+        }
+
+        .cylinder-mini-card {
+            position: absolute;
+            width: 170px;
+            height: 255px;
+            left: -85px;
+            top: -127.5px;
+            border-radius: 14px;
+            background: radial-gradient(circle at 50% 45%, #172248 0%, #090e24 68%, #040714 100%);
+            border: 2px solid rgba(234, 179, 8, 0.88);
+            box-shadow:
+                0 0 24px rgba(234, 179, 8, 0.24),
+                0 14px 30px rgba(0, 0, 0, 0.65);
+            backface-visibility: hidden;
+            -webkit-backface-visibility: hidden;
+            overflow: hidden;
+            will-change: transform, opacity;
+        }
+
+        @media (max-width: 640px) {
+            .cylinder-mini-card {
+                width: 126px;
+                height: 189px;
+                left: -63px;
+                top: -94.5px;
+                border-radius: 11px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Canvas không gian tinh tú & hiệu ứng hạt pha lê tối ưu 60fps -->
+    <canvas id="bgCanvas"></canvas>
+
+    <!-- Màn hình sảnh chính -->
+    <main id="lobbyScreen" class="relative z-10 w-full h-full flex flex-col items-center justify-center px-6 text-center transition-opacity duration-300">
+        <!-- Góc trên bên trái: Biểu tượng + ASTRAL SUMMON + Tinh Tú Triệu Gọi -->
+        <div class="fixed top-4 left-4 sm:top-6 sm:left-6 z-20 flex items-center gap-3 text-left pointer-events-none">
+            <div class="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-400/35 flex items-center justify-center shadow-[0_0_16px_rgba(251,191,36,0.2)]">
+                <i class="ph-fill ph-sparkle text-amber-400 text-lg"></i>
+            </div>
+            <div class="leading-tight">
+                <div class="font-mystic text-xs sm:text-sm font-extrabold tracking-[0.18em] text-white uppercase">
+                    ASTRAL SUMMON
+                </div>
+                <div class="text-[11px] sm:text-xs text-slate-400 font-medium">
+                    Tinh Tú Triệu Gọi
+                </div>
+            </div>
+        </div>
+
+        <!-- Khối nội dung chính giữa màn hình -->
+        <div class="max-w-3xl mx-auto flex flex-col items-center gap-4">
+            <div class="lobby-shooting-star-badge mb-1">
+                <i class="ph-fill ph-shooting-star text-sky-200 text-2xl sm:text-3xl drop-shadow-[0_0_10px_rgba(186,230,253,0.75)]"></i>
+            </div>
+
+            <h1 class="font-mystic text-3xl sm:text-5xl md:text-6xl font-black tracking-[0.1em] uppercase title-astral-gradient">
+                FATE/COMMISION 
+            </h1>
+
+            <p class="text-slate-300/90 text-xs sm:text-base max-w-xl leading-relaxed font-normal">
+                Nhấn nút triệu hồi bên dưới để chạm tới vì sao của bạn
+            </p>
+
+            <button id="summonBtn" class="btn-summon mt-3 px-10 sm:px-12 py-3.5 sm:py-4 rounded-xl font-mystic text-sm sm:text-base font-extrabold tracking-[0.22em] text-white flex items-center gap-2.5 cursor-pointer">
+                <i class="ph-fill ph-sparkle text-sky-300 text-base"></i>
+                <span>RÚT THẺ</span>
+                <i class="ph-fill ph-sparkle text-pink-300 text-base"></i>
+            </button>
+        </div>
+
+        <!-- Gợi ý nhỏ ở chân màn hình chính -->
+        <p id="lobbyAudioHint" class="fixed bottom-4 left-1/2 -translate-x-1/2 text-[11px] sm:text-xs text-slate-500 tracking-wide transition-opacity duration-500 pointer-events-none whitespace-nowrap">
+            Chạm vào màn hình để đánh thức âm vang biển sao
+        </p>
+    </main>
+
+    <!-- Lớp chớp sáng pha lê khi thẻ xuất hiện -->
+    <div id="summonFlash"></div>
+
+    <!-- Thông báo nhỏ (thay thế hoàn toàn cho alert()) -->
+    <div id="toastMessage" class="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 glass-panel text-sky-100 text-xs sm:text-sm px-4 py-2.5 rounded-xl border border-sky-300/40 opacity-0 pointer-events-none transition-opacity duration-300 text-center max-w-xs sm:max-w-md">
+    </div>
+
+    <!-- =====================================================================
+         LỚP TRỤ 10 THẺ XOAY 2 VÒNG
+         ===================================================================== -->
+    <div id="cylinderStage" aria-hidden="true">
+        <div id="cylinderDrum" class="cylinder-drum"></div>
+    </div>
+
+    <!-- =====================================================================
+         SÂN KHẤU TRIỆU HỒI & XEM THẺ 3D
+         ===================================================================== -->
+    <div id="summonStage" class="fixed inset-0 z-20 hidden flex-col justify-between items-center pointer-events-none">
+
+        <!-- Thanh trạng thái trên cùng khi đang xem thẻ -->
+        <div id="stageTopBar" class="w-full max-w-6xl mx-auto p-4 sm:p-6 pr-20 sm:pr-24 flex items-center justify-between opacity-0 transition-opacity duration-500 pointer-events-auto">
+            <button id="backToLobbyBtn" class="glass-panel hover:bg-white/15 text-white px-4 py-2.5 rounded-xl text-sm font-medium flex items-center gap-2 transition-all cursor-pointer">
+                <i class="ph ph-arrow-left text-lg"></i>
+                <span>Quay Về Sảnh</span>
+            </button>
+
+            <div class="glass-panel px-4 py-2 rounded-xl text-xs sm:text-sm text-slate-300 hidden md:flex items-center gap-2">
+                <i class="ph ph-hand-grabbing text-amber-400 text-base"></i>
+                <span>Kéo chuột để xoay 360° • Lăn chuột để phóng to / thu nhỏ</span>
+            </div>
+        </div>
+
+        <!-- Vùng sân khấu 3D trung tâm -->
+        <div id="scene3d" class="scene-3d pointer-events-auto">
+
+            <!-- Tầng hào quang Prisma nằm hoàn toàn phía sau lưng thẻ -->
+            <div id="godRaysContainer" class="aura-behind-layer">
+                <div class="prism-core-halo"></div>
+                <div class="prism-god-rays"></div>
+                <div class="prism-lens-flare"></div>
+
+                <!-- Vòng ma pháp pha lê xoay phía sau thẻ -->
+                <svg class="prism-magic-ring" viewBox="0 0 400 400" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <defs>
+                        <linearGradient id="prismRingGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" stop-color="#bae6fd" stop-opacity="0.9"/>
+                            <stop offset="35%" stop-color="#ffffff" stop-opacity="0.95"/>
+                            <stop offset="70%" stop-color="#f9a8d4" stop-opacity="0.85"/>
+                            <stop offset="100%" stop-color="#fde047" stop-opacity="0.85"/>
+                        </linearGradient>
+                    </defs>
+                    <circle cx="200" cy="200" r="184" stroke="url(#prismRingGrad)" stroke-width="1.5" stroke-dasharray="6 6"/>
+                    <circle cx="200" cy="200" r="168" stroke="url(#prismRingGrad)" stroke-width="1"/>
+                    <polygon points="200,26 350,287 50,287" stroke="url(#prismRingGrad)" stroke-width="1.2" opacity="0.7"/>
+                    <polygon points="200,374 50,113 350,113" stroke="url(#prismRingGrad)" stroke-width="1.2" opacity="0.7"/>
+                    <circle cx="200" cy="200" r="115" stroke="url(#prismRingGrad)" stroke-width="1" stroke-dasharray="2 8"/>
+                </svg>
+            </div>
+
+            <!-- Tấm thẻ 3D hai mặt -->
+            <div id="card3dWrapper" class="card-3d-wrapper">
+
+                <!-- Khối lõi độ dày 3D nối liền mặt trước (+22px) và mặt sau (-22px) -->
+                <div class="card-3d-body-core">
+                    <div class="card-3d-edge-left"></div>
+                    <div class="card-3d-edge-right"></div>
+                    <div class="card-3d-edge-top"></div>
+                    <div class="card-3d-edge-bottom"></div>
+                </div>
+
+                <!-- MẶT TRƯỚC THẺ: Giữ các lớp ngăn cách mờ 4 góc & các yếu tố chi tiết tách lẻ nổi phía trước -->
+                <div class="card-face card-front">
+                    <div class="card-prism-border"></div>
+
+                    <!-- 4 tia lấp lánh nhẹ ở viền góc -->
+                    <svg class="border-sparkle tl" viewBox="0 0 24 24" fill="white"><path d="M12 0L14.5 9.5L24 12L14.5 14.5L12 24L9.5 14.5L0 12L9.5 9.5Z"/></svg>
+                    <svg class="border-sparkle tr" viewBox="0 0 24 24" fill="#bae6fd"><path d="M12 0L14.5 9.5L24 12L14.5 14.5L12 24L9.5 14.5L0 12L9.5 9.5Z"/></svg>
+                    <svg class="border-sparkle bl" viewBox="0 0 24 24" fill="#fbcfe8"><path d="M12 0L14.5 9.5L24 12L14.5 14.5L12 24L9.5 14.5L0 12L9.5 9.5Z"/></svg>
+                    <svg class="border-sparkle br" viewBox="0 0 24 24" fill="#fef08a"><path d="M12 0L14.5 9.5L24 12L14.5 14.5L12 24L9.5 14.5L0 12L9.5 9.5Z"/></svg>
+
+                    <div class="card-inner-frame">
+                        <!-- Lớp mặt kính bóng ngăn cách mặt trước và các elements phía trước nó -->
+                        <div class="card-glass-pane"></div>
+
+                        <!-- Lớp chuyển sắc chân thẻ để làm nổi bật tên & danh hiệu -->
+                        <div class="card-bottom-vignette"></div>
+
+                        <!-- Mặt ngăn cách trong suốt ở giữa, hơi mờ trắng ở 4 góc -->
+                        <div class="card-corner-frosted-separator"></div>
+
+                        <!-- Tầng khung viền & góc bo tách rời cách xa mặt thẻ -->
+                        <div class="card-detached-element card-detached-frame-layer">
+                            <div class="card-ornate-inner-border"></div>
+                            <div class="card-corner-bracket tl"></div>
+                            <div class="card-corner-bracket tr"></div>
+                            <div class="card-corner-bracket bl"></div>
+                            <div class="card-corner-bracket br"></div>
+                        </div>
+
+                        <!-- Huy hiệu 6★ UR tách lẻ nổi cao -->
+                        <div class="card-detached-element card-detached-top-badge">
+                            <span class="card-rarity-badge inline-block px-3.5 py-1 rounded-full text-xs font-extrabold tracking-widest shadow-lg">
+                                6★ UR
+                            </span>
+                        </div>
+
+                        <!-- Biểu tượng tinh tú tách lẻ nổi cao -->
+                        <div class="card-detached-element card-detached-top-emblem">
+                            <div class="card-emblem-badge w-8 h-8 rounded-full flex items-center justify-center shadow-lg">
+                                <i class="ph-fill ph-sparkle text-sm"></i>
+                            </div>
+                        </div>
+
+                        <!-- Cụm danh hiệu, tên thẻ & 6 ngôi sao tách lẻ nổi cao nhất -->
+                        <div class="card-detached-element card-detached-bottom-info bg-transparent text-center">
+                            <p class="text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-200/90 drop-shadow-[0_4px_10px_rgba(0,0,0,0.95)] mb-1">
+                                Prismana • Card
+                            </p>
+                            <h3 class="font-mystic text-lg sm:text-xl font-extrabold text-white tracking-wide drop-shadow-[0_6px_14px_rgba(0,0,0,0.98)] mb-1.5">
+                                COMMISSION
+                            </h3>
+                            <div class="flex items-center justify-center gap-1 text-pink-300 text-xs sm:text-sm drop-shadow-[0_4px_12px_rgba(244,114,182,0.95)]">
+                                <i class="ph-fill ph-star"></i>
+                                <i class="ph-fill ph-star"></i>
+                                <i class="ph-fill ph-star"></i>
+                                <i class="ph-fill ph-star"></i>
+                                <i class="ph-fill ph-star"></i>
+                                <i class="ph-fill ph-star"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Lớp ảnh card2.jpg nằm sát về phía mặt sau thẻ trong không gian 3D -->
+                <div class="card-face pointer-events-none" style="transform: translate3d(0, 0, -20px); overflow: hidden; z-index: 1;">
+                    <img
+                        id="cardArtworkImg"
+                        src="pic/card2.jpg"
+                        alt="Thẻ Bài Tinh Tú"
+                        class="card-artwork-img"
+                        style="transform: scale(1.06);"
+                        draggable="false"
+                        onerror="this.onerror=null; this.src='https://placehold.co/700x1050/131b3a/e2e8f0?text=card2.jpg';"
+                    >
+                </div>
+
+                <!-- MẶT SAU THẺ: Vòng tròn ma pháp kết hợp bản đồ sao vàng kim ở trung tâm -->
+                <div class="card-face card-back">
+                    <svg viewBox="0 0 350 525" class="w-full h-full" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <defs>
+                            <!-- Chất liệu đường phác line vàng kim ánh kim loại -->
+                            <linearGradient id="goldLeafStroke" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <stop offset="0%" stop-color="#fff4c2"/>
+                                <stop offset="28%" stop-color="#eab308"/>
+                                <stop offset="52%" stop-color="#fef08a"/>
+                                <stop offset="76%" stop-color="#ca8a04"/>
+                                <stop offset="100%" stop-color="#fde68a"/>
+                            </linearGradient>
+                            <radialGradient id="goldCenterGlow" cx="50%" cy="50%" r="50%">
+                                <stop offset="0%" stop-color="#fde047" stop-opacity="0.22"/>
+                                <stop offset="55%" stop-color="#ca8a04" stop-opacity="0.06"/>
+                                <stop offset="100%" stop-color="#000000" stop-opacity="0"/>
+                            </radialGradient>
+                        </defs>
+
+                        <!-- Ánh nền dịu ở trung tâm bản đồ sao -->
+                        <circle cx="175" cy="262.5" r="155" fill="url(#goldCenterGlow)"/>
+
+                        <!-- Khung viền đôi cổ điển vàng kim -->
+                        <rect x="14" y="14" width="322" height="497" rx="14" stroke="url(#goldLeafStroke)" stroke-width="1.6"/>
+                        <rect x="22" y="22" width="306" height="481" rx="10" stroke="url(#goldLeafStroke)" stroke-width="0.9" stroke-dasharray="4 3" opacity="0.8"/>
+
+                        <!-- Hoa văn thiên văn 4 góc -->
+                        <path d="M22 64 C42 64 64 42 64 22" stroke="url(#goldLeafStroke)" stroke-width="1.2"/>
+                        <path d="M328 64 C308 64 286 42 286 22" stroke="url(#goldLeafStroke)" stroke-width="1.2"/>
+                        <path d="M22 461 C42 461 64 483 64 503" stroke="url(#goldLeafStroke)" stroke-width="1.2"/>
+                        <path d="M328 461 C308 461 286 483 286 503" stroke="url(#goldLeafStroke)" stroke-width="1.2"/>
+
+                        <!-- Đường trục kinh tuyến dọc & ngang -->
+                        <line x1="175" y1="36" x2="175" y2="489" stroke="url(#goldLeafStroke)" stroke-width="0.7" opacity="0.5"/>
+                        <line x1="36" y1="262.5" x2="314" y2="262.5" stroke="url(#goldLeafStroke)" stroke-width="0.7" opacity="0.5"/>
+
+                        <!-- Trăng khuyết trên và dưới -->
+                        <path d="M167 58 A12 12 0 1 0 183 58 A9 9 0 1 1 167 58 Z" stroke="url(#goldLeafStroke)" stroke-width="1.1" fill="#fde68a" fill-opacity="0.25"/>
+                        <path d="M167 467 A12 12 0 1 1 183 467 A9 9 0 1 0 167 467 Z" stroke="url(#goldLeafStroke)" stroke-width="1.1" fill="#fde68a" fill-opacity="0.25"/>
+
+                        <!-- TẦNG 1: VÒNG CHIA ĐỘ HOÀNG ĐẠO XOAY CHẬM -->
+                        <g class="gold-ring-outer">
+                            <circle cx="175" cy="262.5" r="136" stroke="url(#goldLeafStroke)" stroke-width="1.5"/>
+                            <circle cx="175" cy="262.5" r="126" stroke="url(#goldLeafStroke)" stroke-width="0.9"/>
+                            <circle cx="175" cy="262.5" r="131" stroke="url(#goldLeafStroke)" stroke-width="3.5" stroke-dasharray="1.5 12.2" opacity="0.9"/>
+                            <!-- 12 điểm đánh dấu cung hoàng đạo -->
+                            <circle cx="175" cy="126.5" r="2.6" fill="#fef08a"/>
+                            <circle cx="243" cy="144.7" r="2.2" fill="#fde047"/>
+                            <circle cx="292.8" cy="194.5" r="2.2" fill="#fde047"/>
+                            <circle cx="311" cy="262.5" r="2.6" fill="#fef08a"/>
+                            <circle cx="292.8" cy="330.5" r="2.2" fill="#fde047"/>
+                            <circle cx="243" cy="380.3" r="2.2" fill="#fde047"/>
+                            <circle cx="175" cy="398.5" r="2.6" fill="#fef08a"/>
+                            <circle cx="107" cy="380.3" r="2.2" fill="#fde047"/>
+                            <circle cx="57.2" cy="330.5" r="2.2" fill="#fde047"/>
+                            <circle cx="39" cy="262.5" r="2.6" fill="#fef08a"/>
+                            <circle cx="57.2" cy="194.5" r="2.2" fill="#fde047"/>
+                            <circle cx="107" cy="144.7" r="2.2" fill="#fde047"/>
+                        </g>
+
+                        <!-- TẦNG 2: VÒNG MA PHÁP LỤC GIÁC & QUỸ ĐẠO THIÊN VĂN -->
+                        <g class="gold-ring-inner">
+                            <!-- Lục giác sao ma pháp lồng nhau -->
+                            <polygon points="175,146.5 275.5,320.5 74.5,320.5" stroke="url(#goldLeafStroke)" stroke-width="1.2" opacity="0.88"/>
+                            <polygon points="175,378.5 74.5,204.5 275.5,204.5" stroke="url(#goldLeafStroke)" stroke-width="1.2" opacity="0.88"/>
+                            <!-- Hai quỹ đạo elip đan chéo -->
+                            <ellipse cx="175" cy="262.5" rx="112" ry="48" transform="rotate(35 175 262.5)" stroke="url(#goldLeafStroke)" stroke-width="0.9" stroke-dasharray="4 3" opacity="0.78"/>
+                            <ellipse cx="175" cy="262.5" rx="112" ry="48" transform="rotate(-35 175 262.5)" stroke="url(#goldLeafStroke)" stroke-width="0.9" stroke-dasharray="4 3" opacity="0.78"/>
+                            <circle cx="175" cy="262.5" r="96" stroke="url(#goldLeafStroke)" stroke-width="1.1"/>
+                        </g>
+
+                        <!-- TẦNG 3: BẢN ĐỒ CHÒM SAO VÀNG KIM TẠI TRUNG TÂM -->
+                        <g>
+                            <!-- Vòng tròn bản đồ sao trung tâm -->
+                            <circle cx="175" cy="262.5" r="72" stroke="url(#goldLeafStroke)" stroke-width="1.2" fill="#070c1f" fill-opacity="0.58"/>
+                            <circle cx="175" cy="262.5" r="50" stroke="url(#goldLeafStroke)" stroke-width="0.7" stroke-dasharray="2 4" opacity="0.75"/>
+
+                            <!-- Đường nối các chòm sao -->
+                            <polyline points="122,238 143,216 175,204 205,222 224,250" stroke="url(#goldLeafStroke)" stroke-width="1" opacity="0.92"/>
+                            <polyline points="128,292 152,308 182,316 212,296 224,250" stroke="url(#goldLeafStroke)" stroke-width="1" opacity="0.92"/>
+                            <polyline points="143,216 155,254 128,292" stroke="url(#goldLeafStroke)" stroke-width="0.8" opacity="0.72"/>
+                            <polyline points="205,222 195,270 182,316" stroke="url(#goldLeafStroke)" stroke-width="0.8" opacity="0.72"/>
+
+                            <!-- Các điểm tinh tú trên bản đồ sao -->
+                            <circle cx="122" cy="238" r="2.3" fill="#fef08a"/>
+                            <circle cx="143" cy="216" r="2.8" fill="#ffffff"/>
+                            <circle cx="175" cy="204" r="2.4" fill="#fde047"/>
+                            <circle cx="205" cy="222" r="2.8" fill="#ffffff"/>
+                            <circle cx="224" cy="250" r="2.3" fill="#fef08a"/>
+                            <circle cx="128" cy="292" r="2.5" fill="#fde047"/>
+                            <circle cx="152" cy="308" r="2.1" fill="#fef08a"/>
+                            <circle cx="182" cy="316" r="2.7" fill="#ffffff"/>
+                            <circle cx="212" cy="296" r="2.2" fill="#fde047"/>
+                            <circle cx="155" cy="254" r="1.8" fill="#fef08a"/>
+                            <circle cx="195" cy="270" r="1.8" fill="#fef08a"/>
+
+                            <!-- Ngôi sao 8 cánh vàng kim ở tâm bản đồ -->
+                            <path d="M175 229 L181 255 L207 262.5 L181 270 L175 296 L169 270 L143 262.5 L169 255 Z" stroke="url(#goldLeafStroke)" stroke-width="1.3" fill="#fde047" fill-opacity="0.22"/>
+                            <path d="M175 244 L179 258 L193 262.5 L179 267 L175 281 L171 267 L157 262.5 L171 258 Z" fill="#fef08a"/>
+                            <circle cx="175" cy="262.5" r="3.5" fill="#ffffff"/>
+                        </g>
+
+                        <!-- Tinh tú điểm xuyết nền mặt sau -->
+                        <circle cx="72" cy="112" r="1.4" fill="#fde68a" opacity="0.8"/>
+                        <circle cx="278" cy="112" r="1.4" fill="#fde68a" opacity="0.8"/>
+                        <circle cx="72" cy="413" r="1.4" fill="#fde68a" opacity="0.8"/>
+                        <circle cx="278" cy="413" r="1.4" fill="#fde68a" opacity="0.8"/>
+                        <circle cx="98" cy="84" r="1" fill="#ffffff" opacity="0.6"/>
+                        <circle cx="252" cy="441" r="1" fill="#ffffff" opacity="0.6"/>
+                    </svg>
+                </div>
+            </div>
+        </div>
+
+        <!-- Thanh công cụ phía dưới sau khi rút thẻ -->
+        <div id="stageBottomBar" class="w-full max-w-6xl mx-auto p-4 sm:p-6 flex flex-wrap items-center justify-center gap-2.5 sm:gap-3 opacity-0 transition-opacity duration-500 pointer-events-auto">
+            <button id="toggleSpinBtn" class="glass-panel hover:bg-white/15 text-slate-200 px-4 py-3 rounded-xl text-xs sm:text-sm font-medium flex items-center gap-2 transition-all cursor-pointer">
+                <i class="ph ph-arrows-clockwise text-lg text-sky-300"></i>
+                <span id="toggleSpinText">Tự Xoay 360°: TẮT</span>
+            </button>
+
+            <button id="resetAngleBtn" class="glass-panel hover:bg-white/15 text-slate-200 px-4 py-3 rounded-xl text-xs sm:text-sm font-medium flex items-center gap-2 transition-all cursor-pointer">
+                <i class="ph ph-crosshair text-lg text-amber-300"></i>
+                <span>Cân Bằng Ảnh HD</span>
+            </button>
+
+            <button id="reSummonBtn" class="btn-summon text-white px-5 py-3 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 cursor-pointer">
+                <i class="ph-fill ph-sparkle text-lg text-sky-200"></i>
+                <span>Triệu Hồi Lại</span>
+            </button>
+
+            <!-- Nút dẫn tới liên kết tùy chỉnh (Điền đường dẫn URL của bạn vào thuộc tính href="" bên dưới) -->
+            <a id="customLinkBtn" href="https://drive.google.com/file/d/1N__-_SNM5tooo0PfdHc4pVxse_5TQybX/view?usp=sharing" target="_blank" rel="noopener noreferrer" class="btn-summon text-white px-5 py-3 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 cursor-pointer">
+                <i class="ph-fill ph-arrow-square-out text-lg text-pink-200"></i>
+                <span>Download</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- =====================================================================
+         NÚT BÁNH RĂNG CÀI ĐẶT ÂM THANH & NHẠC NỀN Ở GÓC TRÊN BÊN PHẢI
+         ===================================================================== -->
+    <div id="audioSettingsContainer" class="fixed top-4 right-4 sm:top-6 sm:right-6 z-40 pointer-events-auto">
+        <button id="settingsGearBtn" aria-label="Cài đặt âm thanh" class="glass-panel hover:bg-white/15 text-white w-11 h-11 sm:w-12 sm:h-12 rounded-2xl flex items-center justify-center transition-all border border-white/20 shadow-lg cursor-pointer group">
+            <i id="settingsGearIcon" class="ph-fill ph-gear text-amber-400 text-xl sm:text-2xl transition-transform duration-500 group-hover:rotate-90"></i>
+        </button>
+
+        <!-- Bảng điều khiển âm thanh xổ xuống -->
+        <div id="audioSettingsPopover" class="hidden absolute right-0 mt-3 w-72 sm:w-80 glass-panel rounded-2xl p-5 border border-white/20 shadow-2xl text-left">
+            <div class="flex items-center justify-between pb-3 mb-4 border-b border-white/10">
+                <div class="flex items-center gap-2">
+                    <i class="ph-fill ph-sliders-horizontal text-amber-400 text-lg"></i>
+                    <span class="font-bold text-sm text-white tracking-wide">Cài Đặt Âm Thanh</span>
+                </div>
+                <button id="closeSettingsBtn" class="text-slate-400 hover:text-white p-1 rounded-lg transition-colors cursor-pointer">
+                    <i class="ph ph-x text-base"></i>
+                </button>
+            </div>
+
+            <!-- Bật / Tắt toàn bộ âm thanh -->
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <div class="text-sm font-semibold text-white">Âm Thanh Hệ Thống</div>
+                    <div class="text-[11px] text-slate-400">Nhạc nền & Hiệu ứng rút thẻ</div>
+                </div>
+                <button id="toggleSoundBtn" class="px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 bg-amber-500/20 text-amber-300 border border-amber-400/40 transition-all cursor-pointer">
+                    <i id="soundStatusIcon" class="ph-fill ph-speaker-high text-base"></i>
+                    <span id="soundStatusText">BẬT</span>
+                </button>
+            </div>
+
+            <!-- Thanh trượt Âm Lượng Nhạc Nền -->
+            <div class="mb-4">
+                <div class="flex justify-between text-xs mb-1.5">
+                    <span class="text-slate-300 flex items-center gap-1.5"><i class="ph-fill ph-music-notes text-sky-400"></i> Nhạc Nền</span>
+                    <span id="bgmVolumeLabel" class="font-semibold text-sky-300">70%</span>
+                </div>
+                <input id="bgmVolumeSlider" type="range" min="0" max="100" value="70" class="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-sky-400">
+            </div>
+
+            <!-- Thanh trượt Âm Lượng Hiệu Ứng (SFX) -->
+            <div>
+                <div class="flex justify-between text-xs mb-1.5">
+                    <span class="text-slate-300 flex items-center gap-1.5"><i class="ph-fill ph-sparkle text-pink-400"></i> Hiệu Ứng Triệu Hồi</span>
+                    <span id="sfxVolumeLabel" class="font-semibold text-pink-300">85%</span>
+                </div>
+                <input id="sfxVolumeSlider" type="range" min="0" max="100" value="85" class="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-pink-400">
+            </div>
+        </div>
+    </div>
+
+    <!-- =====================================================================
+         SCRIPT ĐIỀU KHIỂN TOÀN BỘ HỆ THỐNG GACHA 3D, ÂM THANH & HIỆU ỨNG HẠT
+         ===================================================================== -->
+    <script>
+        'use strict';
+
+        /**
+         * 1. BẢNG MÀU PRISMA PHA LÊ TRONG SUỐT
+         */
+        const PRISM_PALETTE = [
+            'rgba(255, 255, 255, 0.92)',
+            'rgba(186, 230, 253, 0.88)',
+            'rgba(125, 211, 252, 0.85)',
+            'rgba(196, 181, 253, 0.85)',
+            'rgba(249, 168, 212, 0.85)',
+            'rgba(254, 240, 138, 0.85)',
+            'rgba(110, 231, 183, 0.82)'
+        ];
+
+        /**
+         * 2. BỘ PHÁT NHẠC NỀN (ost/lobby.mp3 & ost/lobby2.mp3) & ÂM THANH RÚT THẺ (ost/IX.ogg)
+         */
+        const gachaAudio = {
+            enabled: true,
+            initialized: false,
+            bgmVolume: 0.7,
+            sfxVolume: 0.85,
+            currentTrack: 'lobby', // 'lobby' | 'stage' | 'none'
+
+            lobbyBgmAudio: null,
+            stageBgmAudio: null,
+            summonSfxAudio: null,
+            revealTimerId: null,
+            sfxSessionId: 0,
+
+            init() {
+                if (this.initialized) return;
+                try {
+                    // Nhạc nền màn hình chính trước khi rút thẻ
+                    this.lobbyBgmAudio = new Audio('ost/lobby.mp3');
+                    this.lobbyBgmAudio.loop = true;
+                    this.lobbyBgmAudio.preload = 'auto';
+                    this.lobbyBgmAudio.volume = this.enabled ? this.bgmVolume : 0;
+
+                    // Nhạc nền sau hoạt ảnh rút thẻ
+                    this.stageBgmAudio = new Audio('ost/lobby2.mp3');
+                    this.stageBgmAudio.loop = true;
+                    this.stageBgmAudio.preload = 'auto';
+                    this.stageBgmAudio.volume = this.enabled ? this.bgmVolume : 0;
+
+                    // Âm thanh hiệu ứng khi rút thẻ
+                    this.summonSfxAudio = new Audio('ost/IX.ogg');
+                    this.summonSfxAudio.loop = false;
+                    this.summonSfxAudio.preload = 'auto';
+                    this.summonSfxAudio.volume = this.enabled ? this.sfxVolume : 0;
+
+                    this.initialized = true;
+                } catch (err) {
+                    console.warn('Audio init skipped:', err);
+                }
+            },
+
+            safePlay(audioEl, volume) {
+                if (!audioEl || !this.enabled) return;
+                try {
+                    audioEl.volume = volume;
+                    if (audioEl.paused) {
+                        const playPromise = audioEl.play();
+                        if (playPromise && typeof playPromise.catch === 'function') {
+                            playPromise.catch(() => {});
+                        }
+                    }
+                } catch (err) {
+                    console.warn('Audio play warning:', err);
+                }
+            },
+
+            stopAllBgm() {
+                if (!this.initialized) return;
+                try {
+                    if (this.lobbyBgmAudio) {
+                        this.lobbyBgmAudio.pause();
+                        this.lobbyBgmAudio.currentTime = 0;
+                    }
+                    if (this.stageBgmAudio) {
+                        this.stageBgmAudio.pause();
+                        this.stageBgmAudio.currentTime = 0;
+                    }
+                } catch (err) {
+                    console.warn('Stop BGM warning:', err);
+                }
+            },
+
+            applyTrackSwitch(trackName) {
+                if (!this.initialized) this.init();
+                try {
+                    this.clearPendingAudioTimers();
+
+                    if (trackName === 'lobby') {
+                        if (this.stageBgmAudio) {
+                            this.stageBgmAudio.pause();
+                            this.stageBgmAudio.currentTime = 0;
+                        }
+                        if (this.enabled) {
+                            this.safePlay(this.lobbyBgmAudio, this.bgmVolume);
+                        }
+                        return;
+                    }
+
+                    if (trackName === 'stage') {
+                        if (this.lobbyBgmAudio) {
+                            this.lobbyBgmAudio.pause();
+                            this.lobbyBgmAudio.currentTime = 0;
+                        }
+                        if (this.enabled) {
+                            this.safePlay(this.stageBgmAudio, this.bgmVolume);
+                        }
+                        return;
+                    }
+
+                    this.stopAllBgm();
+                } catch (err) {
+                    console.warn('BGM switch warning:', err);
+                }
+            },
+
+            clearPendingAudioTimers() {
+                if (this.revealTimerId) {
+                    clearTimeout(this.revealTimerId);
+                    this.revealTimerId = null;
+                }
+            },
+
+            switchBGM(trackName) {
+                this.currentTrack = trackName;
+                if (!this.enabled) return;
+                if (!this.initialized) this.init();
+                this.applyTrackSwitch(trackName);
+            },
+
+            setBgmVolume(val) {
+                this.bgmVolume = val;
+                if (!this.initialized) this.init();
+                const targetVol = this.enabled ? val : 0;
+                if (this.lobbyBgmAudio) this.lobbyBgmAudio.volume = targetVol;
+                if (this.stageBgmAudio) this.stageBgmAudio.volume = targetVol;
+            },
+
+            setSfxVolume(val) {
+                this.sfxVolume = val;
+                if (!this.initialized) this.init();
+                if (this.summonSfxAudio) {
+                    this.summonSfxAudio.volume = this.enabled ? val : 0;
+                }
+            },
+
+            setEnabled(flag) {
+                this.enabled = flag;
+                if (!this.initialized) this.init();
+
+                const bgmVol = flag ? this.bgmVolume : 0;
+                if (this.lobbyBgmAudio) this.lobbyBgmAudio.volume = bgmVol;
+                if (this.stageBgmAudio) this.stageBgmAudio.volume = bgmVol;
+                if (this.summonSfxAudio) this.summonSfxAudio.volume = flag ? this.sfxVolume : 0;
+
+                if (flag) {
+                    if (this.currentTrack === 'lobby') {
+                        this.safePlay(this.lobbyBgmAudio, this.bgmVolume);
+                    } else if (this.currentTrack === 'stage') {
+                        this.safePlay(this.stageBgmAudio, this.bgmVolume);
+                    }
+                } else {
+                    this.stopAllBgm();
+                    this.stopSfx();
+                }
+            },
+
+            playCharge() {
+                if (!this.enabled) return;
+                if (!this.initialized) this.init();
+
+                try {
+                    this.clearPendingAudioTimers();
+                    this.sfxSessionId++;
+
+                    // Sau khi rút thẻ, tắt nhạc màn hình chính ost/lobby.mp3 và tắt tạm nhạc sân khấu nếu đang bật lại
+                    if (this.lobbyBgmAudio) {
+                        this.lobbyBgmAudio.pause();
+                        this.lobbyBgmAudio.currentTime = 0;
+                    }
+                    if (this.stageBgmAudio) {
+                        this.stageBgmAudio.pause();
+                        this.stageBgmAudio.currentTime = 0;
+                    }
+                    this.currentTrack = 'none';
+
+                    // Phát âm thanh hiệu ứng rút thẻ ost/IX.ogg
+                    if (this.summonSfxAudio) {
+                        this.summonSfxAudio.pause();
+                        this.summonSfxAudio.currentTime = 0;
+                        this.safePlay(this.summonSfxAudio, this.sfxVolume);
+                    }
+                } catch (err) {
+                    console.warn('Charge SFX error:', err);
+                }
+            },
+
+            playReveal(session = this.sfxSessionId) {
+                if (!this.enabled || session !== this.sfxSessionId) return;
+                try {
+                    // Sau hoạt ảnh rút thẻ, tắt nhạc sảnh và bật nhạc nền ost/lobby2.mp3
+                    if (this.lobbyBgmAudio) {
+                        this.lobbyBgmAudio.pause();
+                        this.lobbyBgmAudio.currentTime = 0;
+                    }
+                    this.currentTrack = 'stage';
+                    this.safePlay(this.stageBgmAudio, this.bgmVolume);
+                } catch (err) {
+                    console.warn('Reveal SFX error:', err);
+                }
+            },
+
+            stopSfx() {
+                this.sfxSessionId++;
+                this.clearPendingAudioTimers();
+                try {
+                    if (this.summonSfxAudio) {
+                        this.summonSfxAudio.pause();
+                        this.summonSfxAudio.currentTime = 0;
+                    }
+                } catch (err) {
+                    console.warn('Stop SFX error:', err);
+                }
+            }
+        };
+
+        /**
+         * 3. TRẠNG THÁI ỨNG DỤNG & THAM CHIẾU DOM
+         */
+        const state = {
+            isSummoning: false,
+            stageActive: false,
+            autoSpin360: false,
+            isDragging: false,
+            lastPointerX: 0,
+            lastPointerY: 0,
+            rotX: 0,
+            rotY: 0,
+            rotZ: 0,
+            velX: 0,
+            velY: 0,
+            zoom: 1,
+            targetZoom: 1,
+            initialPinchDist: 0,
+            initialPinchZoom: 1,
+            time: 0
+        };
+
+        const lobbyScreen = document.getElementById('lobbyScreen');
+        const summonStage = document.getElementById('summonStage');
+        const stageTopBar = document.getElementById('stageTopBar');
+        const stageBottomBar = document.getElementById('stageBottomBar');
+        const godRaysContainer = document.getElementById('godRaysContainer');
+        const cardWrapper = document.getElementById('card3dWrapper');
+        const summonFlash = document.getElementById('summonFlash');
+        const scene3d = document.getElementById('scene3d');
+        const toggleSpinText = document.getElementById('toggleSpinText');
+        const toastMessage = document.getElementById('toastMessage');
+        const cylinderStage = document.getElementById('cylinderStage');
+        const cylinderDrum = document.getElementById('cylinderDrum');
+
+        let toastTimer = null;
+        function showToast(msg) {
+            toastMessage.textContent = msg;
+            toastMessage.style.opacity = '1';
+            clearTimeout(toastTimer);
+            toastTimer = setTimeout(() => {
+                toastMessage.style.opacity = '0';
+            }, 2600);
+        }
+
+        /**
+         * 4. HỆ THỐNG CANVAS KHÔNG GIAN & HẠT PHA LÊ PRISMA TỐI ƯU 60FPS
+         */
+        const bgCanvas = document.getElementById('bgCanvas');
+        const ctx = bgCanvas.getContext('2d', { alpha: false });
+        let width = 0;
+        let height = 0;
+        let cachedBgGrad = null;
+
+        const stars = [];
+        const prismShards = [];
+        let convergenceIntensity = 0;
+
+        function resizeCanvas() {
+            const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+            width = window.innerWidth;
+            height = window.innerHeight;
+            bgCanvas.width = Math.floor(width * dpr);
+            bgCanvas.height = Math.floor(height * dpr);
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+            cachedBgGrad = ctx.createRadialGradient(
+                width * 0.5, height * 0.45, 20,
+                width * 0.5, height * 0.5, Math.max(width, height) * 0.85
+            );
+            cachedBgGrad.addColorStop(0, '#101938');
+            cachedBgGrad.addColorStop(0.55, '#070b1e');
+            cachedBgGrad.addColorStop(1, '#03050f');
+
+            initStars();
+        }
+
+        function initStars() {
+            stars.length = 0;
+            const count = Math.min(95, Math.floor((width * height) / 14000));
+            for (let i = 0; i < count; i++) {
+                stars.push({
+                    x: Math.random() * width,
+                    y: Math.random() * height,
+                    r: Math.random() * 1.6 + 0.4,
+                    phase: Math.random() * Math.PI * 2,
+                    speed: Math.random() * 0.02 + 0.008,
+                    color: PRISM_PALETTE[i % PRISM_PALETTE.length]
+                });
+            }
+        }
+
+        function spawnPrismBurst(count) {
+            const cx = width * 0.5;
+            const cy = height * 0.5;
+            for (let i = 0; i < count; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const speed = Math.random() * 9 + 2.5;
+                prismShards.push({
+                    x: cx,
+                    y: cy,
+                    vx: Math.cos(angle) * speed,
+                    vy: Math.sin(angle) * speed,
+                    size: Math.random() * 6 + 3,
+                    rot: Math.random() * Math.PI * 2,
+                    vRot: (Math.random() - 0.5) * 0.16,
+                    life: 1,
+                    decay: Math.random() * 0.014 + 0.008,
+                    color: PRISM_PALETTE[Math.floor(Math.random() * PRISM_PALETTE.length)]
+                });
+            }
+        }
+
+        function renderBackgroundCanvas() {
+            ctx.globalCompositeOperation = 'source-over';
+            ctx.fillStyle = cachedBgGrad || '#040612';
+            ctx.fillRect(0, 0, width, height);
+
+            for (let i = 0; i < stars.length; i++) {
+                const s = stars[i];
+                s.phase += s.speed;
+                const alpha = 0.25 + 0.65 * (0.5 + 0.5 * Math.sin(s.phase));
+                ctx.globalAlpha = alpha;
+                ctx.fillStyle = s.color;
+                ctx.beginPath();
+                ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            if (convergenceIntensity > 0.01) {
+                const cx = width * 0.5;
+                const cy = height * 0.5;
+                ctx.globalCompositeOperation = 'lighter';
+
+                const rayCount = 22;
+                for (let i = 0; i < rayCount; i++) {
+                    const ang = (i / rayCount) * Math.PI * 2 + state.time * 1.6;
+                    const outerDist = (1.15 - convergenceIntensity * 0.72) * Math.max(width, height) * 0.55;
+                    const innerDist = Math.max(8, outerDist - 120 * convergenceIntensity);
+
+                    ctx.strokeStyle = PRISM_PALETTE[i % PRISM_PALETTE.length];
+                    ctx.globalAlpha = 0.55 * convergenceIntensity;
+                    ctx.lineWidth = 2 + convergenceIntensity * 2;
+                    ctx.beginPath();
+                    ctx.moveTo(cx + Math.cos(ang) * outerDist, cy + Math.sin(ang) * outerDist);
+                    ctx.lineTo(cx + Math.cos(ang) * innerDist, cy + Math.sin(ang) * innerDist);
+                    ctx.stroke();
+                }
+
+                const coreRadius = 18 + convergenceIntensity * 72;
+                const coreGrad = ctx.createRadialGradient(cx, cy, 2, cx, cy, coreRadius);
+                coreGrad.addColorStop(0, 'rgba(255, 255, 255, 0.95)');
+                coreGrad.addColorStop(0.45, 'rgba(186, 230, 253, 0.6)');
+                coreGrad.addColorStop(1, 'rgba(244, 114, 182, 0)');
+                ctx.globalAlpha = convergenceIntensity;
+                ctx.fillStyle = coreGrad;
+                ctx.beginPath();
+                ctx.arc(cx, cy, coreRadius, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            if (prismShards.length > 0) {
+                ctx.globalCompositeOperation = 'lighter';
+                for (let i = prismShards.length - 1; i >= 0; i--) {
+                    const p = prismShards[i];
+                    p.x += p.vx;
+                    p.y += p.vy;
+                    p.vx *= 0.972;
+                    p.vy *= 0.972;
+                    p.rot += p.vRot;
+                    p.life -= p.decay;
+
+                    if (p.life <= 0) {
+                        prismShards.splice(i, 1);
+                        continue;
+                    }
+
+                    ctx.save();
+                    ctx.translate(p.x, p.y);
+                    ctx.rotate(p.rot);
+                    ctx.globalAlpha = p.life * 0.85;
+                    ctx.fillStyle = p.color;
+                    ctx.beginPath();
+                    ctx.moveTo(0, -p.size);
+                    ctx.lineTo(p.size * 0.58, 0);
+                    ctx.lineTo(0, p.size);
+                    ctx.lineTo(-p.size * 0.58, 0);
+                    ctx.closePath();
+                    ctx.fill();
+                    ctx.restore();
+                }
+            }
+
+            ctx.globalAlpha = 1;
+            ctx.globalCompositeOperation = 'source-over';
+        }
+
+        /**
+         * 5. CẬP NHẬT ÁNH BÓNG KÍNH NHẸ & VIỀN LẤP LÁNH THEO GÓC NGHIÊNG 3D
+         */
+        function updateCardLighting(rotX, rotY) {
+            const normY = ((rotY % 360) + 360) % 360;
+            const signedY = normY > 180 ? normY - 360 : normY;
+            const glareX = 50 + Math.max(-42, Math.min(42, signedY * 0.85));
+            const glareY = 50 - Math.max(-42, Math.min(42, rotX * 0.95));
+            const tiltIntensity = Math.min(1, (Math.abs(signedY) + Math.abs(rotX)) / 70);
+            const glareOpacity = (0.08 + tiltIntensity * 0.16).toFixed(3);
+            const prismAngle = (130 + signedY * 1.4 + rotX * 0.8).toFixed(1);
+            const cornerFrostOpacity = Math.min(0.95, Math.max(0, (tiltIntensity - 0.08) * 1.15)).toFixed(3);
+
+            document.documentElement.style.setProperty('--glare-x', `${glareX.toFixed(1)}%`);
+            document.documentElement.style.setProperty('--glare-y', `${glareY.toFixed(1)}%`);
+            document.documentElement.style.setProperty('--glare-opacity', glareOpacity);
+            document.documentElement.style.setProperty('--prism-angle', `${prismAngle}deg`);
+            document.documentElement.style.setProperty('--corner-frost-opacity', cornerFrostOpacity);
+        }
+
+        /**
+         * 6. CHUỖI HOẠT ẢNH TRIỆU HỒI GACHA 3D:
+         * - 10 thẻ xếp quanh hình trụ, chỉ lộ mặt sau vàng kim và quay nối tiếp 2 vòng
+         * - Thu dần vào tâm & bùng nổ ánh sáng Prisma để lật mở thẻ bài chính chậm rãi, mượt mà
+         */
+        let summonTimers = [];
+        let revealAnimId = null;
+        const CYLINDER_CARD_COUNT = 10;
+        const cylinderCards = [];
+
+        function createGoldStarMapBackSVG() {
+            return `
+                <svg viewBox="0 0 350 525" class="w-full h-full" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect x="12" y="12" width="326" height="501" rx="12" stroke="#eab308" stroke-width="2" opacity="0.9"/>
+                    <rect x="20" y="20" width="310" height="485" rx="9" stroke="#fef08a" stroke-width="1" stroke-dasharray="4 3" opacity="0.75"/>
+                    <circle cx="175" cy="262.5" r="126" stroke="#eab308" stroke-width="2"/>
+                    <circle cx="175" cy="262.5" r="114" stroke="#fef08a" stroke-width="1" stroke-dasharray="2 10" opacity="0.85"/>
+                    <polygon points="175,156.5 266.8,315.5 83.2,315.5" stroke="#eab308" stroke-width="1.5" opacity="0.85"/>
+                    <polygon points="175,368.5 83.2,209.5 266.8,209.5" stroke="#eab308" stroke-width="1.5" opacity="0.85"/>
+                    <circle cx="175" cy="262.5" r="72" stroke="#fef08a" stroke-width="1.5" fill="#070c1f" fill-opacity="0.65"/>
+                    <polyline points="124,240 146,216 175,204 204,222 224,252" stroke="#fde047" stroke-width="1.3"/>
+                    <polyline points="128,292 154,310 182,316 212,296 224,252" stroke="#fde047" stroke-width="1.3"/>
+                    <circle cx="146" cy="216" r="3.2" fill="#ffffff"/>
+                    <circle cx="204" cy="222" r="3.2" fill="#ffffff"/>
+                    <circle cx="182" cy="316" r="3.2" fill="#ffffff"/>
+                    <path d="M175 231 L181 256 L206 262.5 L181 269 L175 294 L169 269 L144 262.5 L169 256 Z" stroke="#fef08a" stroke-width="1.6" fill="#fde047" fill-opacity="0.28"/>
+                    <circle cx="175" cy="262.5" r="4" fill="#ffffff"/>
+                </svg>
+            `;
+        }
+
+        function ensureCylinderCards() {
+            if (cylinderCards.length === CYLINDER_CARD_COUNT) return;
+            cylinderDrum.innerHTML = '';
+            const backMarkup = createGoldStarMapBackSVG();
+            for (let i = 0; i < CYLINDER_CARD_COUNT; i++) {
+                const el = document.createElement('div');
+                el.className = 'cylinder-mini-card';
+                el.innerHTML = backMarkup;
+                cylinderDrum.appendChild(el);
+                cylinderCards.push(el);
+            }
+        }
+
+        function layoutCylinderCards(drumRotationDeg, radiusScale = 1, cardOpacity = 1) {
+            const baseRadius = window.innerWidth < 640 ? 255 : 350;
+            const radius = baseRadius * radiusScale;
+            const stepAngle = 360 / CYLINDER_CARD_COUNT;
+
+            for (let i = 0; i < CYLINDER_CARD_COUNT; i++) {
+                const el = cylinderCards[i];
+                const baseAngle = i * stepAngle;
+                el.style.opacity = cardOpacity.toFixed(3);
+                el.style.zIndex = '5';
+                el.style.transform = `rotateY(${baseAngle}deg) translate3d(0, 0, ${radius.toFixed(1)}px) scale(${(0.75 + 0.25 * radiusScale).toFixed(3)})`;
+            }
+
+            cylinderDrum.style.transform = `rotateX(-8deg) rotateY(${drumRotationDeg.toFixed(2)}deg)`;
+        }
+
+        function clearSummonTimers() {
+            summonTimers.forEach((id) => clearTimeout(id));
+            summonTimers = [];
+            if (revealAnimId) {
+                cancelAnimationFrame(revealAnimId);
+                revealAnimId = null;
+            }
+        }
+
+        function hideCylinderAndHand() {
+            cylinderStage.classList.remove('active');
+        }
+
+        function updateAutoSpinButtonUI() {
+            toggleSpinText.textContent = state.autoSpin360 ? 'Tự Xoay 360°: BẬT' : 'Tự Xoay 360°: TẮT';
+        }
+
+        function startSummonSequence() {
+            if (state.isSummoning) return;
+            clearSummonTimers();
+            ensureCylinderCards();
+
+            state.isSummoning = true;
+            state.stageActive = true;
+            state.autoSpin360 = false;
+            updateAutoSpinButtonUI();
+
+            lobbyScreen.classList.add('opacity-0', 'pointer-events-none');
+            summonTimers.push(setTimeout(() => {
+                if (state.stageActive) lobbyScreen.classList.add('hidden');
+            }, 350));
+
+            summonStage.classList.remove('hidden');
+            summonStage.classList.add('flex');
+            stageTopBar.classList.add('opacity-0');
+            stageBottomBar.classList.add('opacity-0');
+            godRaysContainer.classList.remove('active');
+
+            state.rotX = 0;
+            state.rotY = 0;
+            state.rotZ = 0;
+            state.velX = 0;
+            state.velY = 0;
+            state.zoom = 1;
+            state.targetZoom = 1;
+
+            cardWrapper.style.opacity = '0';
+            cardWrapper.style.transform = 'translate3d(0, 0, -120px) scale(0.75) rotateY(180deg)';
+
+            cylinderStage.classList.add('active');
+            layoutCylinderCards(0, 1, 1);
+
+            gachaAudio.playCharge();
+
+            const spinStart = performance.now();
+            const spinDuration = 2850;
+            const totalSpinDeg = 720;
+
+            function animateTwoSpins(now) {
+                if (!state.isSummoning) return;
+                const rawT = Math.min(1, (now - spinStart) / spinDuration);
+                const easedSpin = rawT < 0.5
+                    ? 4 * rawT * rawT * rawT
+                    : 1 - Math.pow(-2 * rawT + 2, 3) / 2;
+
+                const currentAngle = totalSpinDeg * easedSpin;
+
+                let radiusScale = 1;
+                let cardOpacity = 1;
+                if (rawT > 0.70) {
+                    const fadeT = (rawT - 0.70) / 0.30;
+                    const fadeEase = fadeT * fadeT * (3 - 2 * fadeT);
+                    radiusScale = 1 - fadeEase * 0.44;
+                    cardOpacity = 1 - fadeEase;
+                    convergenceIntensity = Math.min(0.85, fadeEase * 0.85);
+                } else {
+                    convergenceIntensity = Math.sin(rawT * Math.PI) * 0.42;
+                }
+
+                layoutCylinderCards(currentAngle, radiusScale, cardOpacity);
+
+                if (rawT < 1) {
+                    revealAnimId = requestAnimationFrame(animateTwoSpins);
+                } else {
+                    cylinderStage.classList.remove('active');
+                    summonTimers.push(setTimeout(() => {
+                        if (state.isSummoning) {
+                            gachaAudio.playReveal();
+                            triggerCardReveal();
+                        }
+                    }, 320));
+                }
+            }
+
+            revealAnimId = requestAnimationFrame(animateTwoSpins);
+        }
+
+        function triggerCardReveal() {
+            convergenceIntensity = 0;
+            hideCylinderAndHand();
+
+            spawnPrismBurst(76);
+
+            summonFlash.style.transition = 'none';
+            summonFlash.style.opacity = '0.46';
+            requestAnimationFrame(() => {
+                summonFlash.style.transition = 'opacity 1.35s cubic-bezier(0.22, 1, 0.36, 1)';
+                summonFlash.style.opacity = '0';
+            });
+
+            godRaysContainer.classList.add('active');
+
+            const revealStart = performance.now();
+            const revealDuration = 1950;
+
+            function animateCardEntry(now) {
+                const t = Math.min(1, (now - revealStart) / revealDuration);
+                const easeOut = 1 - Math.pow(1 - t, 2.5);
+
+                const zPos = -150 * (1 - easeOut);
+                const yPos = 24 * (1 - easeOut);
+                const scale = 0.74 + 0.26 * easeOut;
+
+                state.rotY = -180 * (1 - easeOut);
+                state.rotX = Math.sin(t * Math.PI) * 6 * (1 - t);
+                state.rotZ = -4 * (1 - easeOut);
+
+                cardWrapper.style.opacity = String(Math.min(1, t * 1.45));
+                cardWrapper.style.transform = `translate3d(0, ${yPos.toFixed(2)}px, ${zPos.toFixed(2)}px) scale3d(${scale.toFixed(3)}, ${scale.toFixed(3)}, 1) rotateX(${state.rotX.toFixed(2)}deg) rotateY(${state.rotY.toFixed(2)}deg) rotateZ(${state.rotZ.toFixed(2)}deg)`;
+                updateCardLighting(state.rotX, state.rotY);
+
+                if (t < 1 && state.isSummoning) {
+                    revealAnimId = requestAnimationFrame(animateCardEntry);
+                } else {
+                    state.rotX = 0;
+                    state.rotY = 0;
+                    state.rotZ = 0;
+                    state.isSummoning = false;
+                    stageTopBar.classList.remove('opacity-0');
+                    stageBottomBar.classList.remove('opacity-0');
+                }
+            }
+
+            revealAnimId = requestAnimationFrame(animateCardEntry);
+        }
+
+        /**
+         * 7. VÒNG LẶP KẾT XUẤT CHÍNH (60FPS)
+         */
+        function mainAnimationLoop() {
+            state.time += 0.016;
+            renderBackgroundCanvas();
+
+            if (state.stageActive && !state.isSummoning) {
+                if (state.autoSpin360 && !state.isDragging) {
+                    state.rotY += 0.85;
+                    state.rotX = Math.sin(state.time * 1.3) * 9;
+                    state.rotZ = Math.cos(state.time * 0.9) * 3;
+                } else if (!state.isDragging) {
+                    state.rotY += state.velY;
+                    state.rotX += state.velX;
+                    state.velX *= 0.92;
+                    state.velY *= 0.92;
+                    state.rotX = Math.max(-55, Math.min(55, state.rotX));
+                    state.rotZ *= 0.9;
+                }
+
+                // Lơ lửng nhẹ & nội suy độ phóng to / thu nhỏ mượt mà
+                const floatOffsetY = Math.sin(state.time * 2.1) * 6;
+                state.zoom += (state.targetZoom - state.zoom) * 0.14;
+                // Phóng siêu to bằng scale3d kết hợp translateZ mượt mà (vẫn bị giới hạn vật lý bởi độ phân giải pixel thật của file ảnh gốc)
+                const safeZoom = Math.min(state.zoom, 3.6);
+                const zoomZ = Math.min(340, (Math.min(safeZoom, 1.55) - 1) * 240);
+                const extraScale = safeZoom > 1.55 ? safeZoom / 1.55 : 1;
+
+                cardWrapper.style.transform = `translate3d(0, ${floatOffsetY.toFixed(2)}px, ${zoomZ.toFixed(2)}px) scale3d(${extraScale.toFixed(3)}, ${extraScale.toFixed(3)}, 1) rotateX(${state.rotX.toFixed(2)}deg) rotateY(${state.rotY.toFixed(2)}deg) rotateZ(${state.rotZ.toFixed(2)}deg)`;
+                updateCardLighting(state.rotX, state.rotY);
+            }
+
+            requestAnimationFrame(mainAnimationLoop);
+        }
+
+        /**
+         * 8. TƯƠNG TÁC KÉO CHUỘT / CẢM ỨNG ĐỂ XOAY & LĂN CHUỘT PHÓNG TO / THU NHỎ
+         */
+        scene3d.addEventListener('wheel', (e) => {
+            if (!state.stageActive || state.isSummoning) return;
+            e.preventDefault();
+            const zoomStep = e.deltaY * -0.0022;
+            // Cho phép phóng siêu to tới 3.6x
+            state.targetZoom = Math.min(3.6, Math.max(0.55, state.targetZoom + zoomStep));
+        }, { passive: false });
+
+        function handlePointerDown(clientX, clientY) {
+            if (!state.stageActive || state.isSummoning) return;
+            state.isDragging = true;
+            state.lastPointerX = clientX;
+            state.lastPointerY = clientY;
+            state.velX = 0;
+            state.velY = 0;
+        }
+
+        function handlePointerMove(clientX, clientY) {
+            if (!state.isDragging) return;
+            const dx = clientX - state.lastPointerX;
+            const dy = clientY - state.lastPointerY;
+            state.lastPointerX = clientX;
+            state.lastPointerY = clientY;
+
+            state.rotY += dx * 0.45;
+            state.rotX = Math.max(-60, Math.min(60, state.rotX - dy * 0.35));
+            state.velY = dx * 0.22;
+            state.velX = -dy * 0.15;
+        }
+
+        function handlePointerUp() {
+            state.isDragging = false;
+        }
+
+        scene3d.addEventListener('mousedown', (e) => handlePointerDown(e.clientX, e.clientY));
+        window.addEventListener('mousemove', (e) => handlePointerMove(e.clientX, e.clientY));
+        window.addEventListener('mouseup', handlePointerUp);
+
+        scene3d.addEventListener('touchstart', (e) => {
+            if (e.touches.length === 1) {
+                handlePointerDown(e.touches[0].clientX, e.touches[0].clientY);
+            } else if (e.touches.length === 2 && state.stageActive && !state.isSummoning) {
+                state.isDragging = false;
+                const dx = e.touches[0].clientX - e.touches[1].clientX;
+                const dy = e.touches[0].clientY - e.touches[1].clientY;
+                state.initialPinchDist = Math.hypot(dx, dy);
+                state.initialPinchZoom = state.targetZoom;
+            }
+        }, { passive: true });
+
+        window.addEventListener('touchmove', (e) => {
+            if (state.isDragging && e.touches.length === 1) {
+                handlePointerMove(e.touches[0].clientX, e.touches[0].clientY);
+            } else if (e.touches.length === 2 && state.initialPinchDist > 0) {
+                const dx = e.touches[0].clientX - e.touches[1].clientX;
+                const dy = e.touches[0].clientY - e.touches[1].clientY;
+                const currentDist = Math.hypot(dx, dy);
+                const scaleRatio = currentDist / state.initialPinchDist;
+                state.targetZoom = Math.min(3.6, Math.max(0.55, state.initialPinchZoom * scaleRatio));
+            }
+        }, { passive: true });
+
+        window.addEventListener('touchend', () => {
+            handlePointerUp();
+            state.initialPinchDist = 0;
+        });
+
+        /**
+         * 9. XỬ LÝ SỰ KIỆN NÚT BẤM, BÁNH RĂNG CÀI ĐẶT & ÂM THANH
+         */
+        const settingsGearBtn = document.getElementById('settingsGearBtn');
+        const settingsGearIcon = document.getElementById('settingsGearIcon');
+        const audioSettingsPopover = document.getElementById('audioSettingsPopover');
+        const closeSettingsBtn = document.getElementById('closeSettingsBtn');
+        const toggleSoundBtn = document.getElementById('toggleSoundBtn');
+        const soundStatusIcon = document.getElementById('soundStatusIcon');
+        const soundStatusText = document.getElementById('soundStatusText');
+        const bgmVolumeSlider = document.getElementById('bgmVolumeSlider');
+        const bgmVolumeLabel = document.getElementById('bgmVolumeLabel');
+        const sfxVolumeSlider = document.getElementById('sfxVolumeSlider');
+        const sfxVolumeLabel = document.getElementById('sfxVolumeLabel');
+        const customLinkBtn = document.getElementById('customLinkBtn');
+
+        settingsGearBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const isHidden = audioSettingsPopover.classList.contains('hidden');
+            audioSettingsPopover.classList.toggle('hidden', !isHidden);
+            settingsGearIcon.classList.toggle('rotate-90', isHidden);
+        });
+
+        closeSettingsBtn.addEventListener('click', () => {
+            audioSettingsPopover.classList.add('hidden');
+            settingsGearIcon.classList.remove('rotate-90');
+        });
+
+        document.addEventListener('click', (e) => {
+            if (!document.getElementById('audioSettingsContainer').contains(e.target)) {
+                audioSettingsPopover.classList.add('hidden');
+                settingsGearIcon.classList.remove('rotate-90');
+            }
+        });
+
+        toggleSoundBtn.addEventListener('click', () => {
+            const nextState = !gachaAudio.enabled;
+            if (nextState) {
+                gachaAudio.init();
+                gachaAudio.setEnabled(true);
+                soundStatusIcon.className = 'ph-fill ph-speaker-high text-base';
+                soundStatusText.textContent = 'BẬT';
+                toggleSoundBtn.className = 'px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 bg-amber-500/20 text-amber-300 border border-amber-400/40 transition-all cursor-pointer';
+            } else {
+                gachaAudio.setEnabled(false);
+                soundStatusIcon.className = 'ph-fill ph-speaker-slash text-base';
+                soundStatusText.textContent = 'TẮT';
+                toggleSoundBtn.className = 'px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 bg-slate-800 text-slate-400 border border-white/10 transition-all cursor-pointer';
+            }
+        });
+
+        bgmVolumeSlider.addEventListener('input', (e) => {
+            const val = Number(e.target.value);
+            bgmVolumeLabel.textContent = `${val}%`;
+            if (!gachaAudio.initialized && gachaAudio.enabled) {
+                gachaAudio.init();
+            }
+            gachaAudio.setBgmVolume(val / 100);
+        });
+
+        sfxVolumeSlider.addEventListener('input', (e) => {
+            const val = Number(e.target.value);
+            sfxVolumeLabel.textContent = `${val}%`;
+            if (!gachaAudio.initialized && gachaAudio.enabled) {
+                gachaAudio.init();
+            }
+            gachaAudio.setSfxVolume(val / 100);
+        });
+
+        // Mở khóa âm thanh nền sảnh chính ngay lần chạm/click đầu tiên
+        function unlockLobbyAudio() {
+            if (gachaAudio.enabled && !state.stageActive) {
+                gachaAudio.switchBGM('lobby');
+            }
+            window.removeEventListener('pointerdown', unlockLobbyAudio);
+        }
+        window.addEventListener('pointerdown', unlockLobbyAudio);
+
+        // Nút Rút Thẻ & Triệu Hồi Lại
+        document.getElementById('summonBtn').addEventListener('click', startSummonSequence);
+        document.getElementById('reSummonBtn').addEventListener('click', startSummonSequence);
+
+        // Nút Quay Về Sảnh
+        document.getElementById('backToLobbyBtn').addEventListener('click', () => {
+            clearSummonTimers();
+            hideCylinderAndHand();
+            gachaAudio.stopSfx();
+            gachaAudio.stopAllBgm();
+            state.isSummoning = false;
+            state.stageActive = false;
+            state.zoom = 1;
+            state.targetZoom = 1;
+            convergenceIntensity = 0;
+
+            gachaAudio.switchBGM('lobby');
+
+            summonStage.classList.add('hidden');
+            summonStage.classList.remove('flex');
+            godRaysContainer.classList.remove('active');
+
+            lobbyScreen.classList.remove('hidden');
+            requestAnimationFrame(() => {
+                lobbyScreen.classList.remove('opacity-0', 'pointer-events-none');
+            });
+        });
+
+        // Nút Bật / Tắt Tự Xoay 360°
+        document.getElementById('toggleSpinBtn').addEventListener('click', () => {
+            state.autoSpin360 = !state.autoSpin360;
+            updateAutoSpinButtonUI();
+        });
+
+        // Nút Cân Bằng Góc & Đặt Lại Độ Phóng
+        document.getElementById('resetAngleBtn').addEventListener('click', () => {
+            state.rotX = 0;
+            state.rotY = 0;
+            state.rotZ = 0;
+            state.velX = 0;
+            state.velY = 0;
+            state.targetZoom = 1;
+        });
+
+        // Bảo vệ khi người dùng chưa điền URL vào nút customLinkBtn
+        customLinkBtn.addEventListener('click', (e) => {
+            const hrefAttr = customLinkBtn.getAttribute('href');
+            if (!hrefAttr || hrefAttr.trim() === '') {
+                e.preventDefault();
+                showToast('Hãy thêm đường dẫn URL của bạn vào thuộc tính href="" của nút #customLinkBtn trong mã nguồn.');
+            }
+        });
+
+        window.addEventListener('resize', resizeCanvas);
+
+        // Khởi chạy toàn bộ ứng dụng sau khi trang tải xong
+        window.onload = function () {
+            resizeCanvas();
+            mainAnimationLoop();
+        };
+    </script>
+</body>
+</html>
